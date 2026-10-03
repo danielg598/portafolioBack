@@ -1,6 +1,6 @@
 # Handoff — Dockerización y despliegue del portafolio
 
-Última actualización: 2026-09-26.
+Última actualización: 2026-10-03.
 
 ## Cambio de plan (importante)
 
@@ -110,39 +110,68 @@ y luego en la VM: `docker compose pull nginx-proxy && docker compose up -d nginx
 
 Todo esto (front + back + proxy, los 3 juntos) se probó localmente con Docker corriendo en la misma red `edge`: `GET /api/config` a través del proxy devuelve 200 con el JSON real del backend, y una ruta random de Angular devuelve 200 (fallback SPA funcionando).
 
-## Deploy temporal en Render (plan actual, corto plazo)
+## Deploy en Render — ✅ COMPLETADO Y EN PRODUCCIÓN (2026-10-03)
+
+URLs reales:
+- Backend: `https://portafolioback-3eju.onrender.com`
+- Frontend: `https://portafoliofront-xehs.onrender.com`
 
 ### Frontend — Static Site
-- `portafolioFront/render.yaml` creado. Build command: `npm ci && npx ng build --configuration production`. `staticPublishPath: ./dist/portafolio/browser`.
-- Dos reglas de `routes` (el orden importa, Render usa la primera que matchee):
-  1. `rewrite /api/*` → **placeholder** `https://mi-backend.onrender.com/api/:splat` — **hay que reemplazar esto por la URL real del backend una vez desplegado en Render.**
-  2. `rewrite /*` → `/index.html` (fallback del Angular Router).
-- `environment.prod.ts` sigue con `apiUrl: ''` (no necesita cambios): el navegador siempre pide rutas relativas al mismo origen; quién resuelve `/api/*` hacia el backend real es transparente (antes Nginx, ahora el rewrite de Render).
-- Render NO usa el `Dockerfile`/`nginx.conf` de este proyecto para el Static Site — se dejaron intactos (con un comentario aclaratorio arriba de cada uno) para cuando se retome la VM.
+- Se creó como **Static Site manual** (no "Blueprint"), así que `render.yaml` del repo **no se aplica solo** — el build command y publish directory se cargaron a mano en el dashboard, y las reglas de rewrite también se cargaron a mano en la pestaña **Redirects/Rewrites** (ver gotcha de `:splat` abajo).
+- Build command: `npm ci && npx ng build --configuration production`. Publish directory: `./dist/portafolio/browser`.
+- Reglas de rewrite activas (en este orden, en el dashboard):
+  1. `/api/*` → `https://portafolioback-3eju.onrender.com/api/*` (Rewrite)
+  2. `/*` → `/index.html` (Rewrite, fallback del Angular Router)
+- `environment.prod.ts` se sacó del `.gitignore` y ya está commiteado (sin secretos, `apiUrl: ''` a propósito) — **sin esto el build en Render falla** porque `angular.json` lo necesita vía `fileReplacements`.
+- No se necesita ninguna env var en el Static Site del frontend.
 
 ### Backend — Web Service (Docker)
-- Render puede construir directo desde el `Dockerfile` del repo (conecta el repo de GitHub, elige entorno "Docker", detecta el Dockerfile solo) — **no hace falta Docker Hub para esto**, Render construye la imagen en su propia infra.
-- Variables de entorno a cargar manualmente en el dashboard de Render (Environment), mismos nombres que en `.env` local: `MAIL_USERNAME`, `MAIL_PASSWORD`, `CONTACT_RECIPIENT`, `CONTACT_WHATSAPP`, `CONTACT_EMAIL_DISPLAY`, `CORS_ALLOWED_ORIGINS`, `HEALTH_CHECK_TOKEN`.
-- Auto-deploy en cada `git push` a `main` viene activado por defecto al conectar el repo (Settings → Auto-Deploy).
+- Render construyó la imagen directo desde el `Dockerfile` del repo, sin pasar por Docker Hub.
+- Env vars actuales en el dashboard de Render: `CONTACT_RECIPIENT`, `CONTACT_WHATSAPP`, `CONTACT_EMAIL_DISPLAY`, `CORS_ALLOWED_ORIGINS`, `HEALTH_CHECK_TOKEN`, `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`. **Ya NO existen `MAIL_USERNAME`/`MAIL_PASSWORD`** (ver migración a Brevo abajo).
+- **Gotcha importante:** cambiar una env var en el dashboard de Render **no redespliega el servicio solo** — hay que forzar **Manual Deploy → Deploy latest commit** después de guardar, o el proceso corriendo sigue con los valores viejos.
 
-### Endpoint keep-alive (evita que Render duerma el free tier)
-- Nuevo: `HealthController.java` → `GET /api/health/ping`.
-- No toca BD ni nada pesado. Requiere header `X-Health-Token`, comparado con `MessageDigest.isEqual` (constant-time) contra `app.health.token` (`application.yml`) ← `${HEALTH_CHECK_TOKEN}`.
-- Sin header o token incorrecto → `401`. Correcto → `200` con `{"status":"UP","timestamp":"..."}`.
-- Probado localmente con Docker: los 3 casos (sin header / token malo / token correcto) devuelven lo esperado.
-- `.env` local ya tiene un `HEALTH_CHECK_TOKEN` generado (`openssl rand -hex 24`). **En Render hay que crear la misma variable `HEALTH_CHECK_TOKEN`** con un valor secreto (puede ser el mismo u otro nuevo).
-- Configurar en **cron-job.org** (o similar) un GET cada 10 min a `https://tu-backend.onrender.com/api/health/ping` con el header `X-Health-Token: <valor>`.
+### Correo de contacto: migrado de SMTP a Brevo (API HTTPS)
+- **Problema encontrado:** Render bloquea tráfico saliente a los puertos SMTP 25/465/587 en el plan free (política oficial desde sep-2025, para prevenir spam). `JavaMailSender` contra `smtp.gmail.com:587` colgaba ~2 minutos y terminaba en `500`.
+- **Solución:** `ContactService` ahora llama a la API transaccional de Brevo (`https://api.brevo.com/v3/smtp/email`) vía `java.net.http.HttpClient` (sin dependencias nuevas, Jackson ya viene con `spring-boot-starter-web`). Viaja por HTTPS/443, que no está bloqueado.
+- Se quitó `spring-boot-starter-mail` del `pom.xml`.
+- Cuenta Brevo (plan free, 300 emails/día): remitente verificado = `d.alzate598@gmail.com`. Requiere verificar número de teléfono antes de poder enviar (aviso que sale en el dashboard de Brevo la primera vez).
+- Warning esperado y sin solución fácil: Brevo avisa que el remitente no cumple los nuevos requisitos de DKIM/DMARC de Google/Yahoo porque es un Gmail, no un dominio propio — bajo riesgo de ir a spam ocasionalmente, no bloquea el envío. Se resolvería solo con dominio propio + DNS.
+- **Gotcha de seguridad:** una API key de Brevo quedó expuesta sin querer en una captura de pantalla durante el setup — se revocó y se generó una nueva. Recordar: las API keys nunca deben pegarse en capturas ni en el chat, solo copiarse directo al campo de destino.
+
+### Protección anti-bot en el formulario de contacto (honeypot + timing)
+- `ContactRequest` tiene dos campos nuevos no-sensibles: `website` (honeypot, string) y `elapsedMs` (Long).
+- Frontend: input `website` invisible (`position: absolute; left: -9999px`, `aria-hidden`, `tabindex="-1"`) que un humano nunca ve ni llena; `elapsedMs` = tiempo entre que se abre el modal y se envía el form.
+- Backend (`ContactController.looksLikeBot`): si `website` viene con texto, o `elapsedMs < 1500`, se responde `200 {"status":"sent"}` (éxito falso, no delata la trampa) pero **nunca se llama a `contactService.send()`** — no gasta cupo de Brevo ni llega correo falso.
+- Complementa (no reemplaza) el rate-limiter por IP que ya existía.
+- **Verificado end-to-end en producción (2026-10-03):** petición real (website vacío, elapsedMs alto) → `200` en ~1s, correo llegó a Gmail. Petición "bot" (honeypot relleno) → `200` en ~0.3s, **no** llegó correo. La diferencia de tiempo confirma que la petición bot corta antes de llamar a Brevo. Probado también desde el formulario real del frontend (no solo curl): mensaje "¡Mensaje enviado!" en pantalla y correo recibido.
+
+### Keep-alive (ya no se duerme en el free tier)
+- `GET /api/health/ping` con header `X-Health-Token` (constant-time compare) — ver `HealthController.java`.
+- Configurado en **cron-job.org**: GET cada 10 min a `https://portafolioback-3eju.onrender.com/api/health/ping` con header `X-Health-Token: <valor>`. Probado con "ejecución de prueba" → `200 OK` en ~240ms.
+- `HEALTH_CHECK_TOKEN` actual generado con `openssl rand -hex 24` y cargado tanto en Render como en cron-job.org.
+
+### Otros fixes de seguridad aplicados antes del primer deploy
+- Rate-limiter (`ContactController.resolveClientIp`): tomaba el **primer** valor de `X-Forwarded-For` (falsificable por el cliente); ahora toma el **último** (el que añade el proxy de confianza de Render).
+- `ContactRequest.name`: ahora rechaza `\r`/`\n` con `@Pattern` — prevenía inyección de cabeceras en el `Subject` del correo (relevante incluso con Brevo, defensa en profundidad).
+- `CorsConfig`: `CORS_ALLOWED_ORIGINS` se parsea separando por coma antes de pasarlo a Spring (antes, con múltiples orígenes separados por coma, no matcheaba ninguno).
+- **Gotcha de sintaxis Render vs Netlify:** el wildcard de rewrite en Render es `*` tanto en `source` como en `destination` — `:splat` es sintaxis de **Netlify** y causaba que Render reenviara el path literal `/api/:splat` al backend (404). Ya corregido en `render.yaml` y en el dashboard.
+
+### Responsive del frontend (2026-10-03)
+- El sitio no tenía **ninguna** media query — el nav se montaba encima del logo en mobile, y las grillas de 2/3 columnas (hero, about, servicios, proyectos) no colapsaban, cortando contenido a los costados en vez de apilarse (detectado con capturas reales de celular).
+- Arreglado: menú hamburguesa en `nav.component` bajo 860px; breakpoints para colapsar cada grid a 1-2 columnas según ancho en `hero`, `about`, `services`, `projects`. `stack.component` ya era responsive (`grid-template-columns: repeat(auto-fill, minmax(200px,1fr))`), no se tocó.
+- Se subió el presupuesto de CSS por componente en `angular.json` (`anyComponentStyle`: 2kb→4kb warning, 4kb→8kb error) porque el CSS responsive nuevo superaba el límite original.
+- Pendiente de confirmación visual del usuario en su celular contra la URL real de Render tras el deploy.
 
 ## Pendiente / próximos pasos
 
-**Inmediato (Render):**
-1. Hay cambios sin commitear en `portafolioBack` (Dockerfile, HealthController, ajustes a `application.yml`, `.env.example`, este mismo handoff) — falta hacer `git add` + `commit` + `push` a `origin/main`. **Confirmado que `.env` real sigue en `.gitignore`, no se sube.**
-2. Crear el Web Service en Render conectado al repo del backend, configurar las env vars (lista arriba), esperar el primer deploy.
-3. Copiar la URL pública que asigne Render al backend.
-4. Editar `portafolioFront/render.yaml`: reemplazar el placeholder `https://mi-backend.onrender.com` por esa URL real.
-5. Actualizar `CORS_ALLOWED_ORIGINS` en las env vars del backend en Render, apuntando a la URL del frontend en Render (si no, el navegador bloqueará las peticiones por CORS).
-6. Crear el Static Site en Render para el frontend (conectar su repo — confirmar nombre exacto del repo de `portafolioFront`).
-7. Configurar el cron externo (cron-job.org) contra `/api/health/ping` con el `HEALTH_CHECK_TOKEN`.
+**Roadmap confirmado por el usuario (2026-10-03), en este orden:**
+1. Ajustes de diseño al portafolio actual — **responsive ya resuelto** (ver arriba), puede haber más ajustes pendientes.
+2. Separar el portafolio en **dos proyectos independientes** — uno de ellos recibirá el stack completo para desplegar en servidor propio con Docker.
+3. Aprender a desplegar **bases de datos** en ese contexto dockerizado (Postgres/MySQL en contenedor, volúmenes, backups — sin decidir aún).
+4. Montar **Harbor** (registry de contenedores open-source, self-hosted) en infraestructura propia.
+5. Empezar a subir imágenes y contenedores al servidor usando ese Harbor propio.
+
+Esto es la continuación directa del plan de VM pausado más abajo — cuando se retome la VM, Harbor probablemente reemplace o complemente el uso de Docker Hub (`jarvisai68`) como registry.
 
 **Pausado (VM propia — retomar cuando se resuelva Oracle Cloud):**
 1. Resolver el error al crear la cuenta gratuita de Oracle Cloud (no se ha diagnosticado el error puntual todavía).
@@ -159,3 +188,8 @@ Todo esto (front + back + proxy, los 3 juntos) se probó localmente con Docker c
 - Gmail rechaza la contraseña normal de la cuenta para SMTP (`535-5.7.8`) — se necesita App Password.
 - El builder por defecto de `buildx` (`driver: docker`) no soporta bien `--push` multi-plataforma; se creó un builder dedicado `multiarch` (`driver: docker-container`).
 - En Git Bash (Windows) los mounts de volumen con rutas estilo `/c/...` a veces se traducen mal (MSYS path mangling) y montan carpetas vacías o crean carpetas espurias (pasó con `nginx-proxy/conf.d;C`, ya eliminada). Usar rutas estilo `C:\...` en el flag `-v` evita el problema, o `MSYS_NO_PATHCONV=1` antes del comando.
+- Render bloquea los puertos SMTP (25/465/587) salientes en el plan free — cualquier librería de correo que use SMTP crudo (JavaMail, nodemailer con SMTP transport, etc.) cuelga ~2 min y falla. Solución: usar la API HTTPS del proveedor de correo (Brevo, Resend, SendGrid...), nunca SMTP directo, si el backend corre en Render free.
+- Cambiar una env var en el dashboard de Render **no redespliega el servicio automáticamente** — hay que forzar "Manual Deploy → Deploy latest commit" después de guardarla, si no el proceso sigue corriendo con el valor viejo.
+- El wildcard de rewrite en Render es `*` en `source` Y en `destination` (p. ej. `/api/*` → `.../api/*`). `:splat` es sintaxis de Netlify, no de Render, y causa que Render reenvíe el placeholder literal en vez de sustituirlo.
+- Un Static Site creado a mano (no "Blueprint") en Render **ignora el `render.yaml` del repo** — las reglas de redirects/rewrites hay que cargarlas también a mano en la pestaña correspondiente del dashboard.
+- Nunca pegar una API key en una captura de pantalla ni en un chat — si pasa, tratarla como comprometida y revocarla de inmediato, aunque el canal parezca privado.
