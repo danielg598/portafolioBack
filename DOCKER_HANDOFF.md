@@ -160,7 +160,7 @@ URLs reales:
 - El sitio no tenía **ninguna** media query — el nav se montaba encima del logo en mobile, y las grillas de 2/3 columnas (hero, about, servicios, proyectos) no colapsaban, cortando contenido a los costados en vez de apilarse (detectado con capturas reales de celular).
 - Arreglado: menú hamburguesa en `nav.component` bajo 860px; breakpoints para colapsar cada grid a 1-2 columnas según ancho en `hero`, `about`, `services`, `projects`. `stack.component` ya era responsive (`grid-template-columns: repeat(auto-fill, minmax(200px,1fr))`), no se tocó.
 - Se subió el presupuesto de CSS por componente en `angular.json` (`anyComponentStyle`: 2kb→4kb warning, 4kb→8kb error) porque el CSS responsive nuevo superaba el límite original.
-- Pendiente de confirmación visual del usuario en su celular contra la URL real de Render tras el deploy.
+- **Confirmado por el usuario en su celular (2026-10-03):** se ve bien contra la URL real de Render.
 
 ## Pendiente / próximos pasos
 
