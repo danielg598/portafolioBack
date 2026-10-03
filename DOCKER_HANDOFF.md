@@ -165,11 +165,35 @@ URLs reales:
 ## Pendiente / próximos pasos
 
 **Roadmap confirmado por el usuario (2026-10-03), en este orden:**
-1. Ajustes de diseño al portafolio actual — **responsive ya resuelto** (ver arriba), puede haber más ajustes pendientes.
-2. Separar el portafolio en **dos proyectos independientes** — uno de ellos recibirá el stack completo para desplegar en servidor propio con Docker.
+1. Ajustes de diseño al portafolio actual — **responsive ya resuelto** (ver arriba). **No pasar al paso 2 todavía**: el usuario quiere dejar primero todo el portafolio actual "a gusto" (ej. falta foto de perfil real, posibles más ajustes visuales) antes de tocar la separación.
+2. Separar el portafolio en **dos proyectos independientes** — ver plan detallado abajo.
 3. Aprender a desplegar **bases de datos** en ese contexto dockerizado (Postgres/MySQL en contenedor, volúmenes, backups — sin decidir aún).
 4. Montar **Harbor** (registry de contenedores open-source, self-hosted) en infraestructura propia.
 5. Empezar a subir imágenes y contenedores al servidor usando ese Harbor propio.
+
+### Plan: separación en dos proyectos (futuro, sin implementar todavía)
+
+Idea del usuario (2026-10-03): el portafolio actual en Render se queda como la versión "liviana" de cara al público, y se crea un **segundo proyecto separado** para desplegar en el servidor propio (VM + Docker + Harbor), pensado como vitrina técnica más pesada/ambiciosa — con el objetivo explícito de **demostrar que sabe trabajar con distintos procesos en backend y frontend**, inventándose retos (ejemplo propuesto por el usuario: implementar la **máquina Enigma**) e investigando/aprendiendo lo que haga falta en el camino.
+
+Cosas a decidir y documentar aquí cuando se llegue a esta fase (no resolver antes de tiempo):
+
+**Qué se queda en el portafolio liviano (Render) vs. qué se mueve/queda solo en el proyecto "servidor":**
+- Por decidir con el usuario en su momento: ¿el proyecto servidor es un fork completo del portafolio actual + secciones nuevas pesadas, o un proyecto nuevo desde cero que solo comparte identidad visual?
+- Si hay contenido/retos pesados (cómputo intensivo, procesos largos), probablemente no deban vivir en el Render free (límites de CPU/memoria del free tier) — son candidatos naturales para el servidor propio, que es justo la motivación del split.
+
+**Envío de correo — si cambia o no:**
+- La migración a Brevo (API HTTPS) se hizo específicamente porque **Render bloquea los puertos SMTP salientes en el free tier**. En una VM propia esa restricción no existe — ahí sí se podría volver a SMTP directo si se quisiera.
+- Recomendación a evaluar en su momento: mantener Brevo de todas formas aunque ya no haya bloqueo de puertos — es más simple, ya está probado, no depende de IPs del servidor estando en listas negras de spam (problema común de SMTP saliente desde VMs nuevas), y evita volver a lidiar con App Passwords de Gmail. No es obligatorio migrar de vuelta a SMTP solo porque ahora se pueda.
+
+**Keep-alive / cron-job.org — ya no sería necesario:**
+- El cron de `/api/health/ping` cada 10 min existe únicamente porque Render duerme los Web Services free tras 15 min de inactividad. Una VM propia corriendo Docker **no se duerme** — ese cron se podría eliminar (o reutilizar `HealthController` como un healthcheck real de monitoreo, no como keep-alive) una vez el backend "pesado" viva en el servidor propio.
+
+**Ideas de retos/temas para el proyecto "servidor" (brainstorm inicial, sin comprometerse a nada):**
+- Máquina Enigma (criptografía clásica, simulación de rotores) — idea ya propuesta por el usuario.
+- Procesos backend que demuestren manejo de concurrencia/async, trabajos en segundo plano, colas, procesamiento de archivos o imágenes, WebSockets en tiempo real, etc. — sin decidir cuáles todavía, el usuario quiere investigar y aprender sobre la marcha lo que no sepa.
+- Este sería el espacio natural para justificar por qué vale la pena tener servidor propio en vez de seguir en Render free (recursos para cómputo real, no solo servir una SPA + API liviana).
+
+**Nota:** esta sección es un punto de partida para la conversación cuando se llegue a la fase 2 del roadmap, no un plan cerrado — falta que el usuario termine de ajustar el portafolio actual primero.
 
 Esto es la continuación directa del plan de VM pausado más abajo — cuando se retome la VM, Harbor probablemente reemplace o complemente el uso de Docker Hub (`jarvisai68`) como registry.
 
