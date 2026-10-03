@@ -15,6 +15,10 @@ import java.util.Map;
 @RequestMapping("/api/contact")
 public class ContactController {
 
+    // Un formulario llenado por un humano tarda al menos esto en enviarse;
+    // los bots suelen rellenar y mandar el POST casi al instante.
+    private static final long MIN_ELAPSED_MS = 1500;
+
     private final ContactService contactService;
     private final RateLimiterService rateLimiter;
 
@@ -34,8 +38,20 @@ public class ContactController {
                     .body(Map.of("error", "Demasiadas solicitudes. Intenta de nuevo en unos minutos."));
         }
 
+        if (looksLikeBot(req)) {
+            // Respuesta de éxito falsa: no delatamos la trampa ante el bot,
+            // simplemente no se envía el correo de verdad.
+            return ResponseEntity.ok(Map.of("status", "sent"));
+        }
+
         contactService.send(req);
         return ResponseEntity.ok(Map.of("status", "sent"));
+    }
+
+    private boolean looksLikeBot(ContactRequest req) {
+        boolean honeypotFilled = req.website() != null && !req.website().isBlank();
+        boolean tooFast = req.elapsedMs() != null && req.elapsedMs() < MIN_ELAPSED_MS;
+        return honeypotFilled || tooFast;
     }
 
     /**
