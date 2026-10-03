@@ -13,8 +13,16 @@ public class CorsConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
+        // allowedOrigins es vararg: si se recibe una lista separada por comas
+        // hay que partirla, si no Spring la trata como un solo origen literal
+        // (con comas) y no hace match con ningún Origin real.
+        String[] origins = allowedOrigins.split(",");
+        for (int i = 0; i < origins.length; i++) {
+            origins[i] = origins[i].trim();
+        }
+
         registry.addMapping("/api/**")
-                .allowedOrigins(allowedOrigins)
+                .allowedOrigins(origins)
                 .allowedMethods("GET", "POST", "OPTIONS")
                 .allowedHeaders("*");
     }

@@ -38,10 +38,16 @@ public class ContactController {
         return ResponseEntity.ok(Map.of("status", "sent"));
     }
 
+    /**
+     * El primer valor de X-Forwarded-For lo puede inventar el propio cliente;
+     * el proxy de confianza (Render) añade el IP real al final de la lista,
+     * así que se usa el último valor en vez del primero.
+     */
     private String resolveClientIp(HttpServletRequest req) {
         String forwarded = req.getHeader("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+            String[] parts = forwarded.split(",");
+            return parts[parts.length - 1].trim();
         }
         return req.getRemoteAddr();
     }

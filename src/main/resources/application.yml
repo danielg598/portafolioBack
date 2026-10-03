@@ -21,3 +21,5 @@ app:
   rate-limit:
     capacity: 5
     refill-minutes: 10
+  health:
+    token: ${HEALTH_CHECK_TOKEN}
