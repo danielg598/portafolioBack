@@ -162,6 +162,14 @@ URLs reales:
 - Se subió el presupuesto de CSS por componente en `angular.json` (`anyComponentStyle`: 2kb→4kb warning, 4kb→8kb error) porque el CSS responsive nuevo superaba el límite original.
 - **Confirmado por el usuario en su celular (2026-10-03):** se ve bien contra la URL real de Render.
 
+### Foto de perfil real (2026-10-03)
+- Reemplazado el placeholder "DA" del hero por `src/assets/retratoDaniel.jpg`, con `object-fit: cover; object-position: center 20%` para no cortar la cara en los distintos tamaños del `photo-wrapper`.
+
+### Bug encontrado: error de correo en el primer intento desde celular (resuelto)
+- Síntoma: al enviar el formulario de contacto, el primer intento daba "Ocurrió un error al enviar el mensaje. Intenta de nuevo." (no era 429/rate-limit), el segundo intento funcionaba normal.
+- **Causa identificada:** el auto-deploy de Render en `portafolioBack` estaba activado para *cualquier* push a `main`, incluyendo commits que solo tocaban `DOCKER_HANDOFF.md`. Cada uno de esos commits disparaba un rebuild + restart completo del backend (~50s de arranque de Spring Boot). Si el usuario probaba el formulario justo en esa ventana, la petición fallaba por cold start.
+- **Solución aplicada:** se configuró un **Build Filter** en Render (`portafolioback-3eju` → Settings → Build Filters) con `*.md` en "Ignored Paths" — los commits de solo documentación ya no disparan redeploy.
+
 ## Pendiente / próximos pasos
 
 **Roadmap confirmado por el usuario (2026-10-03), en este orden:**
