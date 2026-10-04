@@ -170,6 +170,12 @@ URLs reales:
 - **Causa identificada:** el auto-deploy de Render en `portafolioBack` estaba activado para *cualquier* push a `main`, incluyendo commits que solo tocaban `DOCKER_HANDOFF.md`. Cada uno de esos commits disparaba un rebuild + restart completo del backend (~50s de arranque de Spring Boot). Si el usuario probaba el formulario justo en esa ventana, la petición fallaba por cold start.
 - **Solución aplicada:** se configuró un **Build Filter** en Render (`portafolioback-3eju` → Settings → Build Filters) con `*.md` en "Ignored Paths" — los commits de solo documentación ya no disparan redeploy.
 
+### Ajustes de diseño del contenido (2026-10-04)
+- **Stack** (`stack.component.ts`) con los años reales: Java Spring Boot Avanzado · 3 años, TypeScript Avanzado · 5 años, Docker Intermedio · 1 año, Kubernetes y Python "En formación". Nuevos: **Flutter** y **Dart** ("En formación", categoría `MOBILE`, color `#02569B` / `#0175C2`). Angular, AWS y Machine Learning sin cambios.
+- **Proyectos** (`lang.service.ts`): la tarjeta placeholder 2 pasó de "React Native" a "app móvil / Flutter + Dart" (ES/EN). Las otras dos tarjetas siguen igual.
+- Commiteado y pusheado a `portafolioFront` (main) → Render redespliega el Static Site.
+- **Pendiente de este bloque:** `aboutText1` en `lang.service.ts` aún dice "más de 5 años de experiencia en Angular y Java Spring Boot" (Java ahora son 3) — por decidir/ajustar. Quedaron 3 imágenes sin versionar en `portafolioFront/src/assets/` (`44824.jpg`, `44825.jpg`, `44826.jpg`), no se commitearon a propósito. Se sigue ajustando el diseño (paso 1 del roadmap), aún no se pasa al paso 2.
+
 ## Pendiente / próximos pasos
 
 **Roadmap confirmado por el usuario (2026-10-03), en este orden:**
