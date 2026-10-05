@@ -174,7 +174,8 @@ URLs reales:
 - **Stack** (`stack.component.ts`) con los años reales: Java Spring Boot Avanzado · 3 años, TypeScript Avanzado · 5 años, Docker Intermedio · 1 año, Kubernetes y Python "En formación". Nuevos: **Flutter** y **Dart** ("En formación", categoría `MOBILE`, color `#02569B` / `#0175C2`). Angular, AWS y Machine Learning sin cambios.
 - **Proyectos** (`lang.service.ts`): la tarjeta placeholder 2 pasó de "React Native" a "app móvil / Flutter + Dart" (ES/EN). Las otras dos tarjetas siguen igual.
 - Commiteado y pusheado a `portafolioFront` (main) → Render redespliega el Static Site.
-- **"Sobre mí"** (`aboutText1`/`aboutText2`, ES/EN): ahora dice "5 años en Angular y 3 en Java Spring Boot", y el segundo párrafo menciona formación en Flutter, Kubernetes, Python, Machine Learning y AWS, estudio de aplicación de IA en proyectos reales y capacitación en inglés.
+- **"Sobre mí"** (ES/EN): quedó en **un solo párrafo** (`aboutText1`): "Con 5 años de experiencia en Angular y 3 en Java Spring Boot, construyo aplicaciones web robustas, escalables y bien estructuradas." Se eliminó el segundo párrafo (`aboutText2`, del HTML, la interfaz y los dos idiomas) y la frase de "arquitectura limpia". Decisión del usuario: el resumen se enfoca solo en lo que domina, sin hablar de lo que está estudiando. Se evaluó mencionar Docker/despliegue a producción, sin decidir — se puede añadir a la frase si se quiere.
+- La tarjeta de estadísticas "8+ tecnologías" quedó corta (el stack tiene 10), sin ajustar todavía.
 - Las 3 imágenes sueltas de `src/assets/` (`44824-6.jpg`) eran basura y se borraron; solo queda `retratoDaniel.jpg`.
 - Se sigue ajustando el diseño (paso 1 del roadmap), aún no se pasa al paso 2.
 
